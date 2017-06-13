@@ -12,7 +12,7 @@ trait RequestLine {
 }
 
 object RequestLine {
-  def of(requestLine: String): Err \/ RequestLine = {
+  def of(requestLine: String): Err[String] \/ RequestLine = {
     val params = requestLine.split(" ")
     for {
       _ <- if (params.length == 3) \/.right(()) else \/.left(InvalidRequestLine(requestLine))

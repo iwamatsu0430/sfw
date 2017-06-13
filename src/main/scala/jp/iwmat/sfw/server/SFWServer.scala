@@ -2,10 +2,16 @@ package jp.iwmat.sfw.server
 
 import java.net._
 import java.util.Scanner
+import java.io.{ BufferedReader, InputStream, InputStreamReader }
 
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success, Try }
 
+import scalaz.{ \/, -\/, \/- }
+
+import jp.iwmat.sfw.http.{ Request, RequestLine }
+import jp.iwmat.sfw.syntax._
+
+// TODO: Refactoring for override by user
 trait SFWServer {
 
   val serverSocket: ServerSocket
@@ -13,41 +19,19 @@ trait SFWServer {
   val configuration: Configuration
 
   def listenHttp(): Future[Unit] = {
-    Future {
-      def _listenHttp(): Unit = {
-        (for {
-          socket <- Try { serverSocket.accept() }
-          _ = Future {
-
-            import java.io.{ BufferedReader, InputStreamReader }
-            import scalaz.{ \/, -\/, \/- }
-            import jp.iwmat.sfw.http.RequestLine
-
-            def toErr(t: Throwable): Err = ???
-
-            (for {
-              is <- \/.fromTryCatchNonFatal { socket.getInputStream() } leftMap (toErr)
-              br <- \/.fromTryCatchNonFatal { new BufferedReader(new InputStreamReader(is)) } leftMap (toErr)
-              rawRequestLine <- \/.fromTryCatchNonFatal { br.readLine() } leftMap (toErr)
-              requestLine <- RequestLine.of(rawRequestLine)
-              _ = println(s"method: ${requestLine.method}, uri: ${requestLine.requestUri}, httpVersion: ${requestLine.httpVersion}")
-            } yield ()) match {
-              case \/-(_) =>
-                socket.close()
-              case -\/(e) =>
-                println(e.getMessage)
-                socket.close()
-            }
-
-          }(configuration.listenerEC)
-        } yield ()) match {
-          case Success(_) | Failure(e: SocketTimeoutException) => _listenHttp()
-          case Failure(e: SocketException) => // Exit
-          case Failure(e) => e.printStackTrace()
+    def _listenHttp(): Unit = {
+      tryE { serverSocket.accept() } map { socket =>
+        Future(xxxClient(socket))(configuration.listenerEC)
+      } match {
+        case \/-(_) => _listenHttp() // Loop
+        case -\/(err) => err.value match {
+          case e: SocketTimeoutException => _listenHttp() // Loop
+          case e: SocketException => // Exit
+          case e => e.printStackTrace()
         }
       }
-      _listenHttp()
-    }(configuration.serverEC)
+    }
+    Future(_listenHttp())(configuration.serverEC)
   }
 
   def listenConsole(): Unit = {
@@ -56,6 +40,30 @@ trait SFWServer {
       scanner.next()
     }
     close()
+  }
+
+  def xxxClient(socket: Socket): Unit = {
+    (for {
+      is <- tryE { socket.getInputStream() }
+      request <- readInput(is)
+      // TODO write output
+    } yield ()) match {
+      case \/-(_) =>
+        socket.close()
+      case -\/(e) =>
+        println(e.getMessage)
+        socket.close()
+    }
+  }
+
+  def readInput(is: InputStream): Err[_] \/ Request = {
+    for {
+      br <- tryE { new BufferedReader(new InputStreamReader(is)) }
+      rawRequestLine <- tryE { br.readLine() }
+      requestLine <- RequestLine.of(rawRequestLine)
+      _ = println(s"method: ${requestLine.method}, uri: ${requestLine.requestUri}, httpVersion: ${requestLine.httpVersion}")
+      // TODO read request header and body
+    } yield ???
   }
 
   def close(): Unit = {
@@ -71,23 +79,25 @@ object SFWServer {
 
   def start(): Unit = {
     initialize() match {
-      case Success(server) =>
+      case \/-(server) =>
         println(s"SFW Server Start at http://localhost:${server.configuration.port}/")
         server.listenHttp()
         server.listenConsole()
         println(s"SFW Server Stop")
-      case Failure(e: IllegalArgumentException) =>
-        println(s"Port has used. Use another port.")
-      case Failure(e) =>
-        e.printStackTrace()
+      case -\/(err) => err.value match {
+        case e: IllegalArgumentException =>
+          println(s"Port has used. Use another port.")
+        case e =>
+          e.printStackTrace()
+      }
     }
   }
 
-  def initialize(): Try[SFWServer] = {
+  def initialize(): Err[Throwable] \/ SFWServer = {
     val _configuration = Configuration.create()
     for {
-      _serverSocket <- Try { new ServerSocket(_configuration.port) }
-      _ <- Try { _serverSocket.setSoTimeout(acceptTimeout) }
+      _serverSocket <- tryE { new ServerSocket(_configuration.port) }
+      _ <- tryE { _serverSocket.setSoTimeout(acceptTimeout) }
     } yield new SFWServer {
       val serverSocket = _serverSocket
       val configuration = _configuration

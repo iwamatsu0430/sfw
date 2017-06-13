@@ -18,10 +18,9 @@ object Method {
 
   def list: Set[Method] = Set(OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT)
 
-  def of(value: String): Err \/ Method = {
-    list.find(_.name == value) match {
-      case Some(method) => \/.right(method)
-      case None => \/.left(MethodNotFound(value))
-    }
+  def of(value: String): Err[String] \/ Method = {
+    list.find(_.name == value)
+      .map(\/.right)
+      .getOrElse(\/.left(MethodNotFound(value)))
   }
 }
