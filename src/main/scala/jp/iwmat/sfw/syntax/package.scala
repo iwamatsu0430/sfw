@@ -3,7 +3,7 @@ package jp.iwmat.sfw
 import scalaz.\/
 
 import jp.iwmat.sfw.server.Err
-import jp.iwmat.sfw.server.ServerErr.ThrowableWrapper
+import jp.iwmat.sfw.server.err.serverErr.ThrowableWrapper
 
 package object syntax {
 

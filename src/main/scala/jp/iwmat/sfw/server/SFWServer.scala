@@ -16,12 +16,16 @@ trait SFWServer {
 
   val serverSocket: ServerSocket
 
-  val configuration: Configuration
+  implicit val environment: Environment
+
+  val executionContexts: ExecutionContexts
+
+  val router: Router
 
   def listenHttp(): Future[Unit] = {
     def _listenHttp(): Unit = {
       tryE { serverSocket.accept() } map { socket =>
-        Future(xxxClient(socket))(configuration.listenerEC)
+        Future(xxxClient(socket))(executionContexts.client)
       } match {
         case \/-(_) => _listenHttp() // Loop
         case -\/(err) => err.value match {
@@ -31,7 +35,7 @@ trait SFWServer {
         }
       }
     }
-    Future(_listenHttp())(configuration.serverEC)
+    Future(_listenHttp())(executionContexts.main)
   }
 
   def listenConsole(): Unit = {
@@ -68,8 +72,8 @@ trait SFWServer {
 
   def close(): Unit = {
     serverSocket.close()
-    configuration.serverEC.shutdown()
-    configuration.listenerEC.shutdown()
+    executionContexts.main.shutdown()
+    executionContexts.client.shutdown()
   }
 }
 
@@ -80,27 +84,32 @@ object SFWServer {
   def start(): Unit = {
     initialize() match {
       case \/-(server) =>
-        println(s"SFW Server Start at http://localhost:${server.configuration.port}/")
+        println(s"SFW Server Start at http://localhost:${server.environment.port}/")
         server.listenHttp()
         server.listenConsole()
         println(s"SFW Server Stop")
       case -\/(err) => err.value match {
         case e: IllegalArgumentException =>
           println(s"Port has used. Use another port.")
-        case e =>
+        case e: Throwable =>
           e.printStackTrace()
       }
     }
   }
 
-  def initialize(): Err[Throwable] \/ SFWServer = {
-    val _configuration = Configuration.create()
-    for {
-      _serverSocket <- tryE { new ServerSocket(_configuration.port) }
-      _ <- tryE { _serverSocket.setSoTimeout(acceptTimeout) }
-    } yield new SFWServer {
-      val serverSocket = _serverSocket
-      val configuration = _configuration
-    }
+  def initialize(): Err[_] \/ SFWServer = {
+    Router.load()
+
+    ???
+    // val _environment: Environment = Environment.load()
+    // for {
+    //   _serverSocket <- tryE { new ServerSocket(_environment.port) }
+    //   _ <- tryE { _serverSocket.setSoTimeout(acceptTimeout) }
+    // } yield new SFWServer {
+    //   val serverSocket = _serverSocket
+    //   val environment = _environment
+    //   val executionContexts = ExecutionContexts.initialize()
+    //   val router = Router.load()
+    // }
   }
 }

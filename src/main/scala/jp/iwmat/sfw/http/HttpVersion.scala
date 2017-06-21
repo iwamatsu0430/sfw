@@ -3,7 +3,7 @@ package jp.iwmat.sfw.http
 import scalaz.\/
 
 import jp.iwmat.sfw.server.Err
-import jp.iwmat.sfw.server.HttpErr.HttpVersion._
+import jp.iwmat.sfw.server.err.httpErr.httpVersion._
 
 trait HttpVersion(val enumTag: Int) extends Enum
 object HttpVersion {

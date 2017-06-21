@@ -10,10 +10,9 @@ trait Controller {
   type JSON = jp.iwmat.sfw.json.JSON
   type Form = jp.iwmat.sfw.form.Form
 
-  object Action {
-    def apply[A](f: implicit Request => Response) = ???
-    def async[A](f: implicit Request => Future[Response]) = ???
-  }
+  def action[A](f: implicit Request => Response): Action = ???
+
+  def async[A](f: implicit Request => Future[Response]): Action = ???
 
   def deserialize[A](implicit request: Request): Try[A] = {
     request.body match {

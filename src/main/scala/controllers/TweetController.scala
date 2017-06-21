@@ -4,21 +4,19 @@ import scala.concurrent.Future
 
 import jp.iwmat.sfw.mvc._
 
-class UserController extends Controller {
+class TweetController extends Controller {
 
-  def hello = "aaa"
-
-  @GET("/users")
+  @GET("/tweet")
   def list() = action {
     OK
   }
 
-  @GET("/users/:id")
+  @GET("/tweet/:id")
   def detail(id: Long) = async {
     Future.successful(OK)
   }
 
-  @POST("/users")
+  @POST("/tweet")
   def add() = action[JSON] {
     OK("hogehoge")
   }
