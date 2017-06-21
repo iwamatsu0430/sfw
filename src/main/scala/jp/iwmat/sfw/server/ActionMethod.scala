@@ -17,42 +17,9 @@ case class ActionMethod(
   parentInstance: Any,
   underlying: Method,
   httpMethod: HttpMethod,
-  path: String
+  path: String,
+  pathRegex: Regex
 ) {
-
-  class InvalidTypeRoute extends Throwable
-
-  val pathRegex: Err[_] \/ Regex = {
-    for {
-      _ <- ActionMethod.validate(path)
-      regexPath = ActionMethod.toRegexString(path)
-      paths = regexPath.split("/")
-      variables = paths.filter(_.startsWith(":"))
-      paramTypes = underlying.getParameterTypes
-      result <- tryE {
-        paths
-          .map {
-            case p if p.startsWith(":") =>
-              val index = variables.indexOf(p)
-              paramTypes(index).getName match {
-                case "int" => "(-?\\d+)"
-                case "java.lang.String" => "(\\w+)"
-                case _ => throw new InvalidTypeRoute
-              }
-            case p => p
-          }
-          .mkString("^", "/", "$")
-      } match {
-        case \/-(p) => \/.right(p.r)
-        case -\/(e) => e.value match {
-          case _: ArrayIndexOutOfBoundsException => -\/(EmptyRoute(this)) // FIXME
-          case _: InstantiationException => -\/(EmptyRoute(this)) // FIXME
-          case _: InvalidTypeRoute => -\/(EmptyRoute(this)) // FIXME
-          case _ => -\/(EmptyRoute(this)) // FIXME
-        }
-      }
-    } yield result
-  }
 
   def invoke(params: Object*): Action = {
     underlying.invoke(parentInstance, params:_*).asInstanceOf[Action]
@@ -63,16 +30,52 @@ case class ActionMethod(
 
 object ActionMethod {
 
+  /**
+    * throws ArrayIndexOutOfBoundsException
+    * throws InstantiationException
+    * throws InvalidTypeRoute
+    */
   def of(
     parentClass: Class[_],
     underlying: Method,
     httpMethod: HttpMethod,
     path: String
-  ): Err[_] \/ ActionMethod = {
+  ): ActionMethod = {
+
+    // for {
+    //   _ <- ActionMethod.validate(path)
+    //   regexPath = ActionMethod.toRegexString(path)
+    //   paths = regexPath.split("/")
+    //   variables = paths.filter(_.startsWith(":"))
+    //   paramTypes = underlying.getParameterTypes
+    //   result <- tryE {
+    //     paths
+    //       .map {
+    //         case p if p.startsWith(":") =>
+    //           val index = variables.indexOf(p)
+    //           paramTypes(index).getName match {
+    //             case "int" => "(-?\\d+)"
+    //             case "java.lang.String" => "(\\w+)"
+    //             case _ => throw new InvalidTypeRoute
+    //           }
+    //         case p => p
+    //       }
+    //       .mkString("^", "/", "$")
+    //   } match {
+    //     case \/-(p) => \/.right(p.r)
+    //     case -\/(e) => e.value match {
+    //       case _: ArrayIndexOutOfBoundsException => -\/(EmptyRoute(this)) // FIXME
+    //       case _: InstantiationException => -\/(EmptyRoute(this)) // FIXME
+    //       case _: InvalidTypeRoute => -\/(EmptyRoute(this)) // FIXME
+    //       case _ => -\/(EmptyRoute(this)) // FIXME
+    //     }
+    //   }
+    // } yield result
+
     ???
   }
 
-  def validate(path: String): Err[_] \/ String = {
+  def isValidPath(path: String): Boolean = {
     ???
   }
 

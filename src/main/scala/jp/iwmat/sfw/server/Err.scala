@@ -32,6 +32,7 @@ package object err {
 
   object mvcErr {
     object routing {
+      case class InvalidMethod(value: Err[ActionMethod]) extends Throwable
       case class CannotUseVariableAtHead(value: ActionMethod) extends Err.MVCErr.Routing[ActionMethod]
       case class EmptyRoute(value: ActionMethod) extends Err.MVCErr.Routing[ActionMethod]
     }

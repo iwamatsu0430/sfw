@@ -8,8 +8,11 @@ import collection.JavaConversions._
 import com.typesafe.config.ConfigFactory
 import scalaz.\/
 
-import jp.iwmat.sfw.mvc._
 import jp.iwmat.sfw.http.HttpMethod
+import jp.iwmat.sfw.server.err.serverErr.ThrowableWrapper
+import jp.iwmat.sfw.server.err.mvcErr.routing.InvalidMethod
+import jp.iwmat.sfw.syntax._
+import jp.iwmat.sfw.mvc._
 
 case class Router(actions: Seq[ActionMethod]) {
 
@@ -28,12 +31,13 @@ object Router {
   def load(targetDir: String, controllersKey: String): Err[_] \/ Router = {
     val classPaths = createClassPaths(targetDir)
     val classLoader = createClassLoader(classPaths)
-    val actions = loadControllerPackages(controllersKey).flatMap { classPath =>
+
+    def actions = loadControllerPackages(controllersKey).flatMap { classPath =>
       val cls = classLoader.loadClass(classPath)
       cls.getDeclaredMethods
         .filter(_.getDeclaredAnnotations.length > 0)
         .flatMap { method =>
-          val a: Option[Err[_] \/ ActionMethod] = method.getDeclaredAnnotations
+          method.getDeclaredAnnotations
             .collect {
               case a: OPTIONS => (HttpMethod.OPTIONS, a.path)
               case a: HEAD => (HttpMethod.HEAD, a.path)
@@ -49,14 +53,17 @@ object Router {
             .map { (httpMethod, path) =>
               ActionMethod.of(cls, method, httpMethod, path)
             }
-          val b: Seq[Err[_] \/ ActionMethod] = Seq() // a.toSeq
-          b
       }
-
-      ???
     }
-    // Router(actions)
-    ???
+
+    tryE(actions)
+      .map { actions =>
+        Router(actions)
+      }
+      .leftMap(_.value match {
+        case e: InvalidMethod => e.value
+        case e => ThrowableWrapper(e)
+      })
   }
 
   def createClassPaths(targetDir: String): Seq[File] = {
@@ -73,9 +80,8 @@ object Router {
     )
   }
 
-  def loadControllerPackages(key: String): List[String] = {
+  def loadControllerPackages(key: String): Seq[String] = {
     ConfigFactory.load()
       .getStringList(key)
-      .toList
   }
 }
